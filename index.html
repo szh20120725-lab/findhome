@@ -658,7 +658,7 @@
       state.loggedIn = true; state.userName = r.user.name; state.account = r.user.account;
       state.token = r.token; save(); hideAuth();
       refreshName(); refreshEmpty(); refreshHint();
-      setTimeout(()=>{ $("#input").value = "你好，我是"+state.userName+"，请根据我的需求帮我推荐合适的房子"; send(); }, 300);
+      setTimeout(()=>{ $("#input").value = "你好！我是"+state.userName+"，欢迎回来！请你根据我之前的需求，主动推荐几套鲅鱼圈最近值得关注的房源给我看看，用表格对比"; send(); }, 300);
     });
   }
 
@@ -676,7 +676,7 @@
       state.loggedIn = true; state.userName = r.user.name; state.account = r.user.account;
       state.token = r.token; save(); hideAuth();
       refreshName(); refreshEmpty(); refreshHint();
-      setTimeout(()=>{ $("#input").value = "你好，我是"+name+"，我想在鲅鱼圈买房，请先了解一下我的需求再给我推荐"; send(); }, 300);
+      setTimeout(()=>{ $("#input").value = "你好！我是"+name+"，我刚注册，对鲅鱼圈买房很感兴趣。请你主动向我介绍一下：1）鲅鱼圈现在最值得关注的板块有哪些？2）根据不同的预算（50万/80万/120万）分别推荐几套适合的房源，用表格对比它们的优缺点。3）然后引导我告诉你我的具体需求"; send(); }, 300);
     });
   }
 
