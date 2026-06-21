@@ -636,7 +636,11 @@
     state.account = acc;
     save(); hideAuth();
     refreshName(); refreshEmpty(); refreshHint();
-    $("#input").focus();
+    // Send welcome message to AI
+    setTimeout(()=>{
+      $("#input").value = "你好，我是"+state.userName+"，请根据我的需求帮我推荐合适的房子";
+      send();
+    }, 300);
   }
 
   function doRegister(){
@@ -660,7 +664,11 @@
     state.account = acc;
     save(); hideAuth();
     refreshName(); refreshEmpty(); refreshHint();
-    $("#input").focus();
+    // Send welcome message to AI
+    setTimeout(()=>{
+      $("#input").value = "你好，我是"+name+"，我想在鲅鱼圈买房，请先了解一下我的需求再给我推荐";
+      send();
+    }, 300);
   }
 
   function logout(){
