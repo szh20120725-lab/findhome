@@ -519,7 +519,7 @@
     endpointKey: saved.endpointKey || "primary",
     endpoint: saved.endpoint || ENDPOINTS.primary,
     apiKey:   saved.apiKey || "",
-    messages: [],
+    messages: saved.messages || [],
   };
 
   const $ = (s,r=document) => r.querySelector(s);
@@ -690,12 +690,40 @@
 
   // ---------- empty state ----------
   function refreshEmpty(){
-    if (state.messages.length) return;
-    const p = persona(); const stream = $("#stream"); stream.innerHTML = "";
+    const stream = $("#stream"); stream.innerHTML = "";
     if (!isLoggedIn()){
       stream.innerHTML = `<div class="empty-wrap"><h1>请先<em>登录</em></h1><p class="sub">登录后即可使用 FindHome AI 智能房产顾问</p></div>`;
       return;
     }
+    // Restore saved messages
+    if (state.messages.length > 0){
+      const p = persona();
+      state.messages.forEach(m => {
+        if (m.role === "user"){
+          const row = el("div","msg msg-user");
+          row.innerHTML = `<div class="avatar">${(state.userName||"你").slice(0,1)}</div>
+            <div class="col"><div class="bubble-user">${esc(m.text)}</div></div>`;
+          stream.appendChild(row);
+        } else {
+          const row = el("div","msg msg-assistant"); row.style.setProperty("--phue", p.hue);
+          row.innerHTML = `<div class="avatar">${p.emoji}</div>
+            <div class="col" style="max-width:100%;">
+              <div class="bubble">
+                <div class="trace collapsed" hidden>
+                  <button class="trace-head" type="button"><span class="tlabeltxt">思考过程</span><span class="chev">${chevSvg()}</span></button>
+                  <div class="trace-body"></div>
+                </div>
+                <div class="answer">${md(m.text)}</div>
+              </div>
+            </div>`;
+          row.querySelectorAll("a").forEach(a=>{ a.target="_blank"; a.rel="noopener noreferrer"; });
+          stream.appendChild(row);
+        }
+      });
+      scrollDown();
+      return;
+    }
+    if (state.messages.length) return;
     const wrap = el("div","empty-wrap"); wrap.style.setProperty("--phue", p.hue);
     const greet = state.userName ? `${esc(state.userName)}，` : "";
     wrap.innerHTML = `
@@ -720,6 +748,7 @@
     row.innerHTML = `<div class="avatar">${(state.userName||"你").slice(0,1)}</div>
       <div class="col"><div class="bubble-user">${esc(text)}</div></div>`;
     stream.appendChild(row); scrollDown();
+    save(); // persist messages
   }
 
   // returns a controller object for live updates
@@ -904,7 +933,7 @@
       case "thinking":    ui.thinking(data); break;
       case "tool_call":   ui.toolCall(data, evt.metadata); break;
       case "tool_result": ui.toolResult(data); break;
-      case "complete":    if (!data){ ui.error("回复为空"); break; } ui.complete(data); state.messages.push({ role:"assistant" }); break;
+      case "complete":    if (!data){ ui.error("回复为空"); break; } ui.complete(data); state.messages.push({ role:"assistant", text: data }); save(); break;
       case "error":       ui.error(typeof data==="string"?data:"服务返回错误"); break;
       default: /* unknown event: ignore */ break;
     }
