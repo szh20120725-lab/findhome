@@ -638,6 +638,7 @@
         if (done) return; done = true;
         typing.remove();
         clearToolSpins();
+        traceSpin.classList.remove("spin");
         traceSpin.innerHTML = `<span class="dot-ok">${checkSvg(13)}</span>`;
         traceLabel.textContent = "思考过程";
         if (hasProcess) trace.classList.add("collapsed");
@@ -647,9 +648,10 @@
         scrollDown();
       },
       error(msg){
-        if (done) return; done = true;            // never wipe an already-rendered answer with a late error
+        if (done) return; done = true;
         typing.remove();
         clearToolSpins();
+        traceSpin.classList.remove("spin");
         traceSpin.innerHTML = "";
         const e = el("div","errline", msg); answer.replaceWith(e);
       },
@@ -657,6 +659,7 @@
         done = true;
         typing.remove();
         clearToolSpins();
+        traceSpin.classList.remove("spin");
         traceSpin.innerHTML = "";
         if (answer.classList.contains("empty")){ answer.classList.remove("empty"); answer.textContent = "已停止生成"; }
       },
