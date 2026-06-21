@@ -814,20 +814,24 @@
     for (let i=0; i<order.length; i++){
       const url = order[i];
       inFlight = new AbortController();
+      // Timeout after 45s
+      const timer = setTimeout(()=>{ inFlight.abort(); }, 45000);
       const headers = { "Content-Type":"application/json", "Accept":"text/event-stream" };
       if (state.apiKey) headers["Authorization"] = "Bearer " + state.apiKey;
       try {
         const res = await fetch(url, { method:"POST", headers, body, signal: inFlight.signal });
+        clearTimeout(timer);
         if (!res.ok){
-          lastErr = `服务返回 ${res.status}${res.status===500?"（后端异常，可在设置里切换备用地址或检查接口）":""}`;
-          continue; // try next endpoint
+          lastErr = `服务返回 ${res.status}`;
+          continue;
         }
         if (!res.body){ lastErr = "无响应流"; continue; }
         await readSSE(res.body, ui);
         return true;
       } catch (err){
+        clearTimeout(timer);
         if (err && err.name === "AbortError"){ ui.stop(); return false; }
-        lastErr = "连接失败：" + (err && err.message ? err.message : err) + (i<order.length-1 ? "，尝试备用地址…" : "");
+        lastErr = "连接失败：" + (err && err.message ? err.message : err);
       }
     }
     ui.error(lastErr || "请求失败，请稍后再试。");
@@ -867,7 +871,7 @@
       case "thinking":    ui.thinking(data); break;
       case "tool_call":   ui.toolCall(data, evt.metadata); break;
       case "tool_result": ui.toolResult(data); break;
-      case "complete":    ui.complete(data); state.messages.push({ role:"assistant" }); break;
+      case "complete":    if (!data){ ui.error("回复为空"); break; } ui.complete(data); state.messages.push({ role:"assistant" }); break;
       case "error":       ui.error(typeof data==="string"?data:"服务返回错误"); break;
       default: /* unknown event: ignore */ break;
     }
