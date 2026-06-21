@@ -327,6 +327,13 @@
     color:var(--text-2); font-size:13px; font-weight:560; transition:all .16s var(--ease);}
   .seg button[aria-pressed="true"]{border-color:var(--accent-line); background:var(--accent-soft); color:var(--text);}
 
+  /* ---- Auth Tabs ---- */
+  .auth-tabs{display:flex; gap:0; margin-bottom:18px; border-bottom:2px solid var(--border);}
+  .auth-tab{flex:1; padding:9px; background:none; border:none; color:var(--text-3); font-size:14px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s;}
+  .auth-tab:hover{color:var(--text);}
+  .auth-tab.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .login-err{padding:8px 10px; background:color-mix(in srgb,#E5484D 10%,var(--surface)); border:1px solid color-mix(in srgb,#E5484D 20%,transparent); border-radius:8px; color:#E5484D; font-size:12px; margin-bottom:8px; text-align:center;}
+
   /* ---- Responsive ---- */
   @media (max-width:680px){
     .brand-name span{display:none;}
@@ -391,18 +398,52 @@
   </footer>
 </div>
 
-<!-- name modal -->
-<div class="scrim" id="nameScrim">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
-    <h2 id="nameTitle">怎么称呼你？</h2>
-    <p class="desc">助手会用你的称呼来打招呼，仅保存在本机浏览器里。</p>
-    <div class="field">
-      <label for="nameInput">称呼</label>
-      <input id="nameInput" type="text" maxlength="20" placeholder="例如：李先生 / Allen" />
+<!-- Auth modal (login + register) -->
+<div class="scrim" id="authScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">登录</button>
+      <button class="auth-tab" data-tab="register">注册</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" data-close="nameScrim">取消</button>
-      <button class="btn btn-primary" id="nameSave">保存</button>
+    <div id="authLogin">
+      <h2 id="authTitle">登录 FindHome</h2>
+      <p class="desc">用手机号或邮箱登录</p>
+      <div class="field">
+        <label for="loginAccount">手机号 / 邮箱</label>
+        <input id="loginAccount" type="text" maxlength="50" placeholder="138xxxx 或 name@email.com" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="loginPassword">密码</label>
+        <input id="loginPassword" type="password" maxlength="30" placeholder="输入密码" autocomplete="current-password" />
+      </div>
+      <div class="login-err" id="loginErr" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="loginBtn">登录</button>
+      </div>
+    </div>
+    <div id="authRegister" style="display:none">
+      <h2>注册账号</h2>
+      <p class="desc">注册后即可使用 FindHome AI</p>
+      <div class="field">
+        <label for="regName">姓名</label>
+        <input id="regName" type="text" maxlength="20" placeholder="怎么称呼您？" />
+      </div>
+      <div class="field">
+        <label for="regAccount">手机号 / 邮箱</label>
+        <input id="regAccount" type="text" maxlength="50" placeholder="138xxxx 或 name@email.com" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="regPassword">密码</label>
+        <input id="regPassword" type="password" maxlength="30" placeholder="6位以上密码" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label for="regPassword2">确认密码</label>
+        <input id="regPassword2" type="password" maxlength="30" placeholder="再次输入密码" autocomplete="new-password" />
+      </div>
+      <div class="login-err" id="regErr" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="regBtn">注册并登录</button>
+      </div>
     </div>
   </div>
 </div>
@@ -462,13 +503,18 @@
     { id:"normal", name:"对话", desc:"纯聊天无工具" },
   ];
 
-  const LS = "findhome.v1";
+  const LS = "findhome.v2";
+  const USERS_KEY = "findhome.users";
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
   const save = () => { try { localStorage.setItem(LS, JSON.stringify(state)); } catch {} };
+  const loadUsers = () => { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch { return {}; } };
+  const saveUsers = (u) => { try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch {} };
 
   const saved = load();
   const state = {
     userName: saved.userName || "",
+    account: saved.account || "",
+    loggedIn: saved.loggedIn || false,
     persona:  PERSONAS.some(p=>p.id===saved.persona) ? saved.persona : "analyst",
     mode:     MODES.some(m=>m.id===saved.mode) ? saved.mode : "online",
     theme:    saved.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
@@ -529,15 +575,94 @@
     $("#hint").innerHTML = `<span><b>${p.name}</b> · ${m.name}模式</span><span><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>`;
   }
   function refreshName(){
-    const n = state.userName || "访客";
+    const n = state.userName || "未登录";
     $("#nameLabel").textContent = n;
-    $("#nameAv").textContent = (state.userName || "你").slice(0,1);
+    $("#nameAv").textContent = (state.userName || "?").slice(0,1);
+  }
+  function isLoggedIn(){ return state.loggedIn; }
+
+  // ---- Auth functions ----
+  function showAuth(tab){
+    tab = tab || "login";
+    $("#authScrim").classList.add("open");
+    $("#authLogin").style.display = tab === "login" ? "" : "none";
+    $("#authRegister").style.display = tab === "register" ? "" : "none";
+    $("#authScrim .auth-tab[data-tab=login]").classList.toggle("active", tab==="login");
+    $("#authScrim .auth-tab[data-tab=register]").classList.toggle("active", tab==="register");
+    $("#loginErr").style.display = "none";
+    $("#regErr").style.display = "none";
+    if (tab === "login") setTimeout(()=>$("#loginAccount").focus(), 80);
+    else setTimeout(()=>$("#regName").focus(), 80);
+  }
+  function hideAuth(){ closeModal("authScrim"); }
+
+  function doLogin(){
+    const acc = $("#loginAccount").value.trim();
+    const pw = $("#loginPassword").value;
+    if (!acc){ showErr("loginErr", "请输入手机号或邮箱"); return; }
+    if (!pw){ showErr("loginErr", "请输入密码"); return; }
+    const users = loadUsers();
+    const key = acc.toLowerCase();
+    if (!users[key]){ showErr("loginErr", "账号不存在，请先注册"); return; }
+    if (users[key].password !== pw){ showErr("loginErr", "密码错误"); return; }
+    // Login success
+    state.loggedIn = true;
+    state.userName = users[key].name;
+    state.account = acc;
+    save(); hideAuth();
+    refreshName(); refreshEmpty(); refreshHint();
+    $("#input").focus();
+  }
+
+  function doRegister(){
+    const name = $("#regName").value.trim();
+    const acc = $("#regAccount").value.trim();
+    const pw = $("#regPassword").value;
+    const pw2 = $("#regPassword2").value;
+    if (!name){ showErr("regErr", "请输入姓名"); return; }
+    if (!acc){ showErr("regErr", "请输入手机号或邮箱"); return; }
+    if (pw.length < 6){ showErr("regErr", "密码至少6位"); return; }
+    if (pw !== pw2){ showErr("regErr", "两次密码不一致"); return; }
+    const users = loadUsers();
+    const key = acc.toLowerCase();
+    if (users[key]){ showErr("regErr", "此账号已注册，请直接登录"); return; }
+    // Register
+    users[key] = { name, password: pw, createdAt: Date.now() };
+    saveUsers(users);
+    // Auto login
+    state.loggedIn = true;
+    state.userName = name;
+    state.account = acc;
+    save(); hideAuth();
+    refreshName(); refreshEmpty(); refreshHint();
+    $("#input").focus();
+  }
+
+  function logout(){
+    state.loggedIn = false;
+    state.userName = "";
+    state.account = "";
+    state.messages = [];
+    save();
+    $("#stream").innerHTML = "";
+    refreshName(); refreshEmpty();
+    showAuth("login");
+  }
+
+  function showErr(id, msg){
+    const el = $("#"+id);
+    el.textContent = msg; el.style.display = "";
+    setTimeout(()=>{ el.style.display = "none"; }, 3000);
   }
 
   // ---------- empty state ----------
   function refreshEmpty(){
     if (state.messages.length) return;
     const p = persona(); const stream = $("#stream"); stream.innerHTML = "";
+    if (!isLoggedIn()){
+      stream.innerHTML = `<div class="empty-wrap"><h1>请先<em>登录</em></h1><p class="sub">登录后即可使用 FindHome AI 智能房产顾问</p></div>`;
+      return;
+    }
     const wrap = el("div","empty-wrap"); wrap.style.setProperty("--phue", p.hue);
     const greet = state.userName ? `${esc(state.userName)}，` : "";
     wrap.innerHTML = `
@@ -763,6 +888,7 @@
   }
 
   async function send(){
+    if (!isLoggedIn()){ showAuth("login"); return; }
     if (busy){ if (inFlight) inFlight.abort(); return; }
     const input = $("#input");
     const text = input.value.trim();
@@ -794,6 +920,8 @@
   function init(){
     applyTheme(); renderPersonas(); renderModes(); refreshHint(); refreshName(); refreshEmpty();
 
+    if (!isLoggedIn()) showAuth("login");
+
     $("#themeBtn").onclick = () => { state.theme = state.theme==="dark"?"light":"dark"; save(); applyTheme(); };
 
     const input = $("#input");
@@ -803,10 +931,23 @@
     });
     $("#sendBtn").onclick = send;
 
-    // name modal
-    $("#nameBtn").onclick = () => { $("#nameInput").value = state.userName; openModal("nameScrim"); setTimeout(()=>$("#nameInput").focus(),60); };
-    $("#nameSave").onclick = () => { state.userName = $("#nameInput").value.trim().slice(0,20); save(); refreshName(); refreshEmpty(); closeModal("nameScrim"); };
-    $("#nameInput").addEventListener("keydown", e=>{ if(e.key==="Enter") $("#nameSave").click(); });
+    // auth modal / logout
+    $("#nameBtn").onclick = () => {
+      if (isLoggedIn()){
+        if (confirm("确定退出登录吗？")) logout();
+      } else {
+        showAuth("login");
+      }
+    };
+    $("#authScrim .auth-tab[data-tab=login]").onclick = () => showAuth("login");
+    $("#authScrim .auth-tab[data-tab=register]").onclick = () => showAuth("register");
+    $("#loginBtn").onclick = doLogin;
+    $("#regBtn").onclick = doRegister;
+    $("#loginAccount").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+    $("#loginPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+    ["regName","regAccount","regPassword","regPassword2"].forEach(id=>{
+      $("#"+id).addEventListener("keydown", e=>{ if(e.key==="Enter") doRegister(); });
+    });
 
     // settings modal
     $("#settingsBtn").onclick = () => {
@@ -834,8 +975,8 @@
     document.querySelectorAll(".scrim").forEach(s => s.addEventListener("click", e => { if(e.target===s) closeModal(s.id); }));
     document.addEventListener("keydown", e => { if(e.key==="Escape") document.querySelectorAll(".scrim.open").forEach(s=>closeModal(s.id)); });
 
-    // first-run: ask for name once
-    if (!saved.userName){ setTimeout(()=>{ $("#nameBtn").click(); }, 450); }
+    // not logged in: show auth
+    if (!isLoggedIn()){ setTimeout(()=>{ showAuth("login"); }, 300); }
   }
 
   init();
