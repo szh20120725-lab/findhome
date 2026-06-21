@@ -490,8 +490,8 @@
 
   // ---------- config ----------
   const ENDPOINTS = {
-    primary:  "https://web-j7tgg1ovg-petersu-s-projects.vercel.app/api/chat",
-    fallback: "https://web-j7tgg1ovg-petersu-s-projects.vercel.app/api/chat",
+    primary:  "https://web-3svzxznqp-petersu-s-projects.vercel.app/api/chat",
+    fallback: "https://web-3svzxznqp-petersu-s-projects.vercel.app/api/chat",
   };
   const PERSONAS = [
     { id:"analyst",  emoji:"📊", name:"数据专家",   hue:"var(--p-analyst)",
@@ -653,21 +653,13 @@
     const pw = $("#loginPassword").value;
     if (!acc){ showErr("loginErr", "请输入手机号或邮箱"); return; }
     if (!pw){ showErr("loginErr", "请输入密码"); return; }
-    const users = loadUsers();
-    const key = acc.toLowerCase();
-    if (!users[key]){ showErr("loginErr", "账号不存在，请先注册"); return; }
-    if (users[key].password !== pw){ showErr("loginErr", "密码错误"); return; }
-    // Login success
-    state.loggedIn = true;
-    state.userName = users[key].name;
-    state.account = acc;
-    save(); hideAuth();
-    refreshName(); refreshEmpty(); refreshHint();
-    // Send welcome message to AI
-    setTimeout(()=>{
-      $("#input").value = "你好，我是"+state.userName+"，请根据我的需求帮我推荐合适的房子";
-      send();
-    }, 300);
+    authAPI("login", acc, pw, "").then(r => {
+      if (r.error){ showErr("loginErr", r.error); return; }
+      state.loggedIn = true; state.userName = r.user.name; state.account = r.user.account;
+      state.token = r.token; save(); hideAuth();
+      refreshName(); refreshEmpty(); refreshHint();
+      setTimeout(()=>{ $("#input").value = "你好，我是"+state.userName+"，请根据我的需求帮我推荐合适的房子"; send(); }, 300);
+    });
   }
 
   function doRegister(){
@@ -679,23 +671,40 @@
     if (!acc){ showErr("regErr", "请输入手机号或邮箱"); return; }
     if (pw.length < 6){ showErr("regErr", "密码至少6位"); return; }
     if (pw !== pw2){ showErr("regErr", "两次密码不一致"); return; }
-    const users = loadUsers();
-    const key = acc.toLowerCase();
-    if (users[key]){ showErr("regErr", "此账号已注册，请直接登录"); return; }
-    // Register
-    users[key] = { name, password: pw, createdAt: Date.now() };
-    saveUsers(users);
-    // Auto login
-    state.loggedIn = true;
-    state.userName = name;
-    state.account = acc;
-    save(); hideAuth();
-    refreshName(); refreshEmpty(); refreshHint();
-    // Send welcome message to AI
-    setTimeout(()=>{
-      $("#input").value = "你好，我是"+name+"，我想在鲅鱼圈买房，请先了解一下我的需求再给我推荐";
-      send();
-    }, 300);
+    authAPI("register", acc, pw, name).then(r => {
+      if (r.error){ showErr("regErr", r.error); return; }
+      state.loggedIn = true; state.userName = r.user.name; state.account = r.user.account;
+      state.token = r.token; save(); hideAuth();
+      refreshName(); refreshEmpty(); refreshHint();
+      setTimeout(()=>{ $("#input").value = "你好，我是"+name+"，我想在鲅鱼圈买房，请先了解一下我的需求再给我推荐"; send(); }, 300);
+    });
+  }
+
+  async function authAPI(action, account, password, name){
+    try {
+      const authUrl = (state.endpoint||ENDPOINTS.primary).replace("/api/chat","/api/auth");
+      const res = await fetch(authUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, account, password, name }),
+      });
+      return await res.json();
+    } catch(e) {
+      // Fallback to localStorage when server unreachable
+      if (action === "register") {
+        const users = loadUsers(); const key = account.toLowerCase();
+        if (users[key]) return { error: "此账号已注册" };
+        users[key] = { name, password, createdAt: Date.now() }; saveUsers(users);
+        return { user: { name, account }, token: key };
+      }
+      if (action === "login") {
+        const users = loadUsers(); const key = account.toLowerCase();
+        if (!users[key]) return { error: "账号不存在" };
+        if (users[key].password !== password) return { error: "密码错误" };
+        return { user: { name: users[key].name, account }, token: key };
+      }
+      return { error: "网络错误" };
+    }
   }
 
   function logout(){
