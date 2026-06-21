@@ -6,9 +6,7 @@
 <meta name="color-scheme" content="light dark" />
 <title>FindHome AI · 帮你买房</title>
 <meta name="description" content="FindHome AI - 懂数据、懂邻里、懂投资的买房助手" />
-<!-- Markdown render (safe): marked + DOMPurify. Falls back to plain text if CDN is blocked. -->
-<script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<!-- No external CDN – markdown renders locally -->
 <style>
   /* ============ Design tokens (one accent: jade. light + dark locked) ============ */
   :root{
@@ -529,16 +527,43 @@
   const esc = s => String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
   const persona = () => PERSONAS.find(p=>p.id===state.persona) || PERSONAS[0];
 
-  // ---------- markdown (safe, with fallback) ----------
+  // ---------- markdown (fully local, no CDN needed) ----------
   function md(text){
     const raw = String(text ?? "");
-    if (window.marked && window.DOMPurify){
-      try {
-        window.marked.setOptions({ breaks:true, gfm:true });
-        return window.DOMPurify.sanitize(window.marked.parse(raw), { ADD_ATTR:["target"] });
-      } catch {}
-    }
-    return "<p>" + esc(raw).replace(/\n{2,}/g,"</p><p>").replace(/\n/g,"<br>") + "</p>";
+    let h = esc(raw);
+    // Code blocks
+    h = h.replace(/```(\w*)\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>');
+    // Inline code
+    h = h.replace(/`([^`]+)`/g,'<code>$1</code>');
+    // Bold + italic
+    h = h.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+    h = h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    h = h.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    // Images
+    h = h.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img alt="$1" src="$2" style="max-width:100%">');
+    // Links
+    h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Headers
+    h = h.replace(/^#### (.+)$/gm,'<h4>$1</h4>');
+    h = h.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+    h = h.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+    h = h.replace(/^# (.+)$/gm,'<h1>$1</h1>');
+    // Blockquote
+    h = h.replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>');
+    // Horizontal rule
+    h = h.replace(/^---$/gm,'<hr>');
+    // Lists
+    h = h.replace(/^- (.+)$/gm,'<li>$1</li>');
+    h = h.replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>');
+    // Numbered lists
+    h = h.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+    // Tables (simple)
+    h = h.replace(/^\|(.+)\|$/gm, function(m){ var c=m.split('|').filter(Boolean).map(function(x){return x.trim()}); return '<tr>'+c.map(function(x){return /^[-:]+$/.test(x)?'<th>'+x+'</th>':'<td>'+x+'</td>'}).join('')+'</tr>'; });
+    h = h.replace(/(<tr>[\s\S]*?<\/tr>)/g, function(m){ return m.includes('<th>') ? '<thead>'+m+'</thead>' : '<tbody>'+m+'</tbody>'; });
+    // Paragraphs
+    h = h.replace(/\n\n/g, '</p><p>');
+    h = h.replace(/\n/g, '<br>');
+    return '<p>'+h+'</p>';
   }
 
   // ---------- theme ----------
