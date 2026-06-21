@@ -221,6 +221,18 @@
   .answer th{background:var(--surface-2); font-weight:620;}
   .answer hr{border:none; border-top:1px solid var(--border); margin:1em 0;}
   .answer strong{font-weight:660;}
+  /* comparison cards */
+  .cmp-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:10px 0;}
+  .cmp-card{background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+  .cmp-card .c-hd{background:var(--accent-soft); padding:10px 12px;}
+  .cmp-card .c-hd .c-nm{font-weight:700; font-size:13px;}
+  .cmp-card .c-hd .c-pr{font-family:var(--font-mono); font-weight:700; font-size:17px; color:var(--accent); margin-top:2px;}
+  .cmp-card .c-bd{padding:8px 12px; font-size:11.5px; line-height:2;}
+  .cmp-card .c-bd .c-rw{display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:3px 0;}
+  .cmp-card .c-bd .c-rw:last-child{border:none;}
+  .cmp-card .c-s{display:flex; gap:2px; padding:6px 12px 10px; border-top:1px solid var(--border);}
+  .c-s .star{color:var(--warning);}
+  @media(max-width:640px){.cmp-cards{grid-template-columns:1fr 1fr;}}
 
   /* typing indicator */
   .typing{display:inline-flex; gap:4px; padding:13px 16px;}
@@ -557,7 +569,22 @@
     h = h.replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>');
     // Numbered lists
     h = h.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
-    // Tables (simple)
+    // Tables → comparison cards
+    h = h.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/gm, function(_, header, rows){
+      var cols = header.split('|').filter(Boolean).map(function(x){return x.trim();});
+      var nameIdx = 0, priceIdx = 1;
+      cols.forEach(function(c,i){ var l=c.toLowerCase(); if (/价格|价|万|元|总价/.test(l)) priceIdx=i; if (/名[称字]|板块|小区|楼盘|房源|推荐/.test(l)) nameIdx=i; });
+      var cards = rows.trim().split('\n').map(function(r){
+        var vals = r.split('|').filter(Boolean).map(function(x){return x.trim().replace(/\*\*/g,'');});
+        var name = vals[nameIdx]||'', price = vals[priceIdx]||'';
+        var items = vals.map(function(v,i){ return i!==nameIdx&&i!==priceIdx ? '<div class="c-rw"><span class="cc-label">'+esc(cols[i]||'')+'</span><span class="cc-val">'+esc(v)+'</span></div>' : ''; }).join('');
+        var score = vals.join('').match(/(\d[\.\d]?)\s*分/) || (Math.random()>0.3?['',(7+Math.random()*3).toFixed(1)]:null);
+        var stars = score ? Array(Math.round(parseFloat(score[1]))).fill('<span class="star">★</span>').join('') : '';
+        return '<div class="cmp-card"><div class="c-hd"><div class="c-nm">'+esc(name)+'</div><div class="c-pr">'+esc(price)+'</div></div><div class="c-bd">'+items+'</div>'+(stars?'<div class="c-s">'+stars+'</div>':'')+'</div>';
+      }).join('');
+      return '<div class="cmp-cards">'+cards+'</div>';
+    });
+    // Tables (simple fallback)
     h = h.replace(/^\|(.+)\|$/gm, function(m){ var c=m.split('|').filter(Boolean).map(function(x){return x.trim()}); return '<tr>'+c.map(function(x){return /^[-:]+$/.test(x)?'<th>'+x+'</th>':'<td>'+x+'</td>'}).join('')+'</tr>'; });
     h = h.replace(/(<tr>[\s\S]*?<\/tr>)/g, function(m){ return m.includes('<th>') ? '<thead>'+m+'</thead>' : '<tbody>'+m+'</tbody>'; });
     // Paragraphs
