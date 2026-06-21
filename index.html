@@ -504,9 +504,9 @@
   const LS = "findhome.v2";
   const USERS_KEY = "findhome.users";
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
-  const save = () => { try { localStorage.setItem(LS, JSON.stringify(state)); } catch {} };
-  const loadUsers = () => { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch { return {}; } };
-  const saveUsers = (u) => { try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch {} };
+  const save = () => { try { var s = JSON.stringify(state); localStorage.setItem(LS, s); } catch(e){ console.warn('save failed',e); } };
+  const loadUsers = () => { try { var u = localStorage.getItem(USERS_KEY); return u ? JSON.parse(u) : {}; } catch { return {}; } };
+  const saveUsers = (u) => { try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch(e){ console.warn('saveUsers failed',e); } };
 
   const saved = load();
   const state = {
@@ -1013,7 +1013,10 @@
     document.addEventListener("keydown", e => { if(e.key==="Escape") document.querySelectorAll(".scrim.open").forEach(s=>closeModal(s.id)); });
 
     // not logged in: show auth
-    if (!isLoggedIn()){ setTimeout(()=>{ showAuth("login"); }, 300); }
+    if (!isLoggedIn()){
+      const hasUsers = Object.keys(loadUsers()).length > 0;
+      setTimeout(()=>{ showAuth(hasUsers ? "login" : "register"); }, 300);
+    }
   }
 
   init();
